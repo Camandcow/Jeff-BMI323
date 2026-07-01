@@ -1,0 +1,82 @@
+#include <Wire.h>
+#include <7Semi_BMI323.h>
+
+BMI323_7Semi imu;
+
+float roll = 0;
+float pitch = 0;
+float yaw = 0;
+
+unsigned long lastTime;
+
+void setup()
+{
+  Serial.begin(115200);
+  Wire.begin();
+
+  delay(1000);
+
+  if (!imu.beginI2C(0x69))
+  {
+    Serial.println("BMI323 not detected");
+    while (1);
+  }
+
+  imu.setAccelConfig(
+    BMI3_ACC_ODR_100HZ,
+    BMI3_ACC_BW_ODR_QUARTER,
+    BMI3_ACC_MODE_NORMAL,
+    BMI3_ACC_RANGE_2G,
+    BMI3_ACC_AVG1);
+
+  imu.setGyroConfig(
+    BMI3_GYR_ODR_100HZ,
+    BMI3_GYR_BW_ODR_QUARTER,
+    BMI3_GYR_MODE_NORMAL,
+    BMI3_GYR_RANGE_2000DPS,
+    BMI3_GYR_AVG1);
+
+  lastTime = millis();
+}
+
+void loop()
+{
+  float ax, ay, az;
+  float gx, gy, gz;
+
+  bool accelOK = imu.readAccel(ax, ay, az);
+  bool gyroOK = imu.readGyro(gx, gy, gz);
+
+  if (!accelOK || !gyroOK)
+    return;
+
+  unsigned long now = millis();
+  float dt = (now - lastTime) / 1000.0f;
+  lastTime = now;
+
+  float accelRoll =
+      atan2(ay, az) * 180.0 / PI;
+
+  float accelPitch =
+      atan2(-ax,
+            sqrt(ay * ay + az * az))
+      * 180.0 / PI;
+
+  roll =
+      0.98f * (roll + gx * dt) +
+      0.02f * accelRoll;
+
+  pitch =
+      0.98f * (pitch + gy * dt) +
+      0.02f * accelPitch;
+
+  yaw += gz * dt;
+
+  Serial.print(roll, 2);
+  Serial.print(",");
+  Serial.print(pitch, 2);
+  Serial.print(",");
+  Serial.println(yaw, 2);
+
+  delay(20);
+}
